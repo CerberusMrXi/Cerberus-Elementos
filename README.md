@@ -26,6 +26,12 @@ Designed for educators, students, and science enthusiasts alike, the platform el
 
 ---
 
+## 📹 Demo Video
+
+https://user-images.githubusercontent.com/your-username/your-repo/demo.mp4
+
+---
+
 ## Core Features
 
 ### Touchless Hand Gesture Control System

@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>Cerberus Elementos — Hand-Controlled Atomic Lab</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0a0a0f;--panel:#12121a;--cyan:#00e5ff;--text:#eee;--muted:#888;--line:#1e1e2a;--ok:#4ade80;--gold:#fbbf24}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;overflow:hidden}
+#boot{position:fixed;inset:0;z-index:1000;background:#0a0a0f;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px}
+#boot h1{font-size:2rem;font-weight:700;letter-spacing:.1em}#boot h1 span{color:var(--cyan)}
+#boot .sub{font-size:.7rem;color:var(--muted);letter-spacing:.2em;margin:10px 0 22px;text-transform:uppercase}
+#boot p{max-width:440px;color:var(--muted);font-size:.88rem;line-height:1.55;margin-bottom:26px}
+#startBtn{padding:14px 40px;background:var(--cyan);color:#0a0a0f;border:none;border-radius:4px;font-weight:700;font-size:1rem;cursor:pointer}
+#startBtn:disabled{opacity:.5}
+#msg{margin-top:14px;font-size:.85rem;color:var(--cyan);min-height:1.3em}#msg.err{color:#f87171}
+#boot .author{position:absolute;bottom:18px;font-size:.75rem;color:#555}
+
+#app{display:none;width:100%;height:100%;position:relative}
+#layout{display:grid;grid-template-columns:250px 1fr 270px;height:100%}
+@media(max-width:1050px){#layout{grid-template-columns:1fr}#left,#right{position:absolute;z-index:4;max-height:35%;overflow:auto;opacity:0.95}#left{top:48px;left:0;width:200px}#right{top:48px;right:0;width:200px}#center{z-index:5}}
+
+#left{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:12px;gap:10px;overflow-y:auto}
+#camBox{position:relative;width:100%;aspect-ratio:4/3;background:#000;border-radius:6px;overflow:hidden;border:1px solid var(--line);flex-shrink:0}
+#camBox video,#camBox canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#camBox video{opacity:0}
+#camBox .label{position:absolute;bottom:5px;left:7px;font-size:10px;color:var(--cyan);z-index:2}
+#gestBox h3,#infoBox h3{font-size:.62rem;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin-bottom:6px}
+.g-row{display:flex;align-items:flex-start;gap:8px;padding:5px 0;font-size:.72rem;color:var(--muted);border-bottom:1px solid var(--line);line-height:1.3}
+.g-row.on{color:var(--cyan)}
+.g-row .ic{width:22px;text-align:center;font-size:.95rem;flex-shrink:0}
+#status{font-size:.72rem;color:var(--muted);margin-top:auto;padding-top:8px;border-top:1px solid var(--line)}
+#status div{display:flex;justify-content:space-between;padding:2px 0}
+#status .ok{color:var(--ok)}
+
+#center{position:relative;display:flex;flex-direction:column;min-width:0;z-index:5}
+#tableView,#grid,.cell{pointer-events:auto}
+#grid{position:relative;z-index:6}
+#header{height:46px;display:flex;align-items:center;padding:0 14px;gap:14px;border-bottom:1px solid var(--line);background:var(--panel);flex-shrink:0}
+#header .logo{font-size:.82rem;font-weight:700;letter-spacing:.06em}#header .logo span{color:var(--cyan)}
+#modes{display:flex;gap:4px}
+#modes button{padding:6px 12px;border:1px solid var(--line);background:0;color:var(--muted);font-size:.72rem;font-weight:600;cursor:pointer;border-radius:4px}
+#modes button.on{border-color:var(--cyan);color:var(--cyan);background:rgba(0,229,255,.08)}
+#stage{flex:1;position:relative;min-height:0}
+#tableView{position:absolute;inset:0;padding:12px;overflow:auto;display:flex;flex-direction:column}
+#tableView h2{font-size:.65rem;letter-spacing:.14em;color:var(--muted);margin-bottom:10px;text-transform:uppercase}
+#grid{display:grid;grid-template-columns:repeat(18,1fr);grid-template-rows:repeat(9,minmax(32px,1fr));gap:2px;flex:1;min-height:320px}
+.cell{border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid transparent;cursor:pointer;transition:transform .1s,box-shadow .1s}
+.cell .n{font-size:8px;opacity:.65}.cell .s{font-weight:700;font-size:12px}
+.cell.empty{visibility:hidden;pointer-events:none}
+.cell.alkali{background:#3b1515;color:#fca5a5}.cell.alkaline{background:#3b2a10;color:#fcd34d}
+.cell.transition{background:#152a45;color:#93c5fd}.cell.post{background:#103b38;color:#5eead4}
+.cell.metalloid{background:#2a3810;color:#bef264}.cell.nonmetal{background:#103b28;color:#86efac}
+.cell.halogen{background:#2a1545;color:#d8b4fe}.cell.noble{background:#152045;color:#a5b4fc}
+.cell.lanth{background:#3b1530;color:#f0abfc}
+.cell.act{background:#3b1528;color:#f9a8d4}
+.cell:hover,.cell.hov{transform:scale(1.07);border-color:var(--gold);box-shadow:0 0 10px rgba(251,191,36,.45);z-index:2}
+.cell.sel{border-color:var(--cyan);box-shadow:0 0 12px rgba(0,229,255,.5);z-index:3}
+
+#atomView{position:absolute;inset:0;display:none}
+#atomView canvas{display:block;width:100%;height:100%}
+#atomHUD{position:absolute;top:12px;left:12px;z-index:8;background:rgba(18,18,26,.88);border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-size:.78rem;pointer-events:none}
+#atomHUD .title{font-weight:700;color:var(--cyan);margin-bottom:6px}
+#atomHUD .row{display:flex;gap:12px;padding:2px 0}
+#atomHUD .p{color:#ef5350}#atomHUD .n{color:#42a5f5}#atomHUD .e{color:#ffd54f}
+#atomBar{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:none;gap:5px;flex-wrap:wrap;justify-content:center;background:rgba(18,18,26,.94);border:1px solid var(--line);border-radius:8px;padding:8px;z-index:10}
+#atomBar button{padding:7px 11px;background:rgba(0,229,255,.08);border:1px solid var(--line);border-radius:4px;color:var(--text);font-size:.72rem;cursor:pointer}
+#atomBar button:hover{border-color:var(--cyan);background:rgba(0,229,255,.15)}
+#atomBar .sep{width:1px;background:var(--line);margin:0 3px}
+
+#right{background:var(--panel);border-left:1px solid var(--line);padding:12px;overflow-y:auto}
+#right h3{font-size:.62rem;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
+#detail .sym{font-size:2.2rem;font-weight:800;color:var(--cyan);line-height:1}
+#detail .name{font-size:.95rem;font-weight:600;margin:3px 0 10px}
+#detail .row{display:flex;justify-content:space-between;font-size:.78rem;padding:4px 0;border-bottom:1px solid var(--line)}
+#detail .lb{color:var(--muted)}
+#detail .charge{margin-top:10px;text-align:center;font-weight:700;padding:7px;border-radius:4px;background:rgba(0,229,255,.1);color:var(--cyan);font-size:.85rem}
+#detail .charge.pos{color:#fb923c;background:rgba(251,146,60,.12)}
+#detail .charge.neg{color:#7dd3fc;background:rgba(125,211,252,.12)}
+#detail .desc{margin-top:10px;font-size:.72rem;color:var(--muted);line-height:1.45}
+#molPick{display:none;margin-top:12px}
+#molPick button{display:block;width:100%;text-align:left;padding:7px 9px;margin-bottom:3px;background:rgba(0,229,255,.05);border:1px solid var(--line);border-radius:4px;color:var(--text);font-size:.75rem;cursor:pointer}
+#molPick button.on,#molPick button:hover{border-color:var(--cyan);color:var(--cyan)}
+
+/* Full-screen fingertip cursor */
+#cursor{position:fixed;z-index:500;width:28px;height:28px;border:2px solid var(--gold);border-radius:50%;pointer-events:none;transform:translate(-50%,-50%);display:none;box-shadow:0 0 0 3px rgba(251,191,36,.25),0 0 14px rgba(251,191,36,.5);transition:width .08s,height .08s,border-color .08s}
+#cursor.show{display:block}
+#cursor.pinch{width:18px;height:18px;border-color:var(--cyan);box-shadow:0 0 0 4px rgba(0,229,255,.3),0 0 16px var(--cyan)}
+#cursor .dot{position:absolute;inset:6px;background:var(--gold);border-radius:50%}
+#toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:400;background:rgba(18,18,26,.95);border:1px solid var(--cyan);color:var(--cyan);padding:8px 16px;border-radius:6px;font-size:.8rem;font-weight:600;opacity:0;transition:opacity .25s;pointer-events:none}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="boot">
+  <h1>CERBERUS <span>ELEMENTOS</span></h1>
+  <div class="sub">Accurate Hand-Controlled Atomic Laboratory</div>
+  <p>Fingertip cursor on the table · 360° hand rotation · Pinch zoom (open = in, close = out) · Gesture particle controls · Bohr-model atoms</p>
+  <button id="startBtn">Start Laboratory</button>
+  <div id="msg"></div>
+  <div class="author">Created by Sudeepa Wanigarathna</div>
+</div>
+
+<div id="app">
+  <div id="cursor"><div class="dot"></div></div>
+  <div id="toast"></div>
+  <div id="layout">
+    <div id="left">
+      <div id="camBox">
+        <video id="video" playsinline muted></video>
+        <canvas id="cv"></canvas>
+        <div class="label">CAMERA · HAND TRACKING</div>
+      </div>
+      <div id="gestBox">
+        <h3>Hand Control System</h3>
+        <div class="g-row" id="gPoint"><span class="ic">☝</span><span><b>Point</b> — cursor + select element</span></div>
+        <div class="g-row" id="gPalm"><span class="ic">🖐</span><span><b>One hand open + move</b> — rotate atom 360°</span></div>
+        <div class="g-row" id="gPinch"><span class="ic">双手</span><span><b>Two hands</b> — closer = zoom out · farther = zoom in</span></div>
+        <div class="g-row" id="gFist"><span class="ic">✊</span><span><b>Fist</b> — open Atomic Structure</span></div>
+        <div class="g-row" id="gPeace"><span class="ic">✌</span><span><b>Peace</b> — + Electron</span></div>
+        <div class="g-row" id="gThumb"><span class="ic">👍</span><span><b>Thumbs up</b> — + Proton</span></div>
+        <div class="g-row" id="gDown"><span class="ic">👎</span><span><b>Thumbs down</b> — − Electron</span></div>
+        <div class="g-row"><span class="ic">🖱</span><span><b>Mouse</b> — drag rotate · scroll zoom</span></div>
+      </div>
+      <div id="status">
+        <div><span>Camera</span><span id="stCam">—</span></div>
+        <div><span>Hand</span><span id="stHand">—</span></div>
+        <div><span>Mode</span><span id="stMode">Table</span></div>
+        <div><span>FPS</span><span id="stFps">—</span></div>
+      </div>
+    </div>
+
+    <div id="center">
+      <div id="header">
+        <div class="logo">CERBERUS <span>ELEMENTOS</span></div>
+        <div id="modes">
+          <button class="on" data-m="table">Periodic Table</button>
+          <button data-m="atom">Atomic Structure</button>
+          <button data-m="mol">Molecules</button>
+        </div>
+      </div>
+      <div id="stage">
+        <div id="tableView">
+          <h2>Click element to select · Double-click to open atom · Or point + fist</h2>
+          <div id="grid"></div>
+        </div>
+        <div id="atomView">
+          <div id="atomHUD">
+            <div class="title" id="hudTitle">Oxygen (O)</div>
+            <div class="row"><span class="p">● Protons: <b id="hudP">8</b></span></div>
+            <div class="row"><span class="n">● Neutrons: <b id="hudN">8</b></span></div>
+            <div class="row"><span class="e">● Electrons: <b id="hudE">8</b></span></div>
+            <div class="row">Mass number A: <b id="hudA">16</b></div>
+          </div>
+        </div>
+        <div id="atomBar">
+          <button data-k="p" data-d="1">+ Proton</button>
+          <button data-k="p" data-d="-1">− Proton</button>
+          <span class="sep"></span>
+          <button data-k="n" data-d="1">+ Neutron</button>
+          <button data-k="n" data-d="-1">− Neutron</button>
+          <span class="sep"></span>
+          <button data-k="e" data-d="1">+ Electron</button>
+          <button data-k="e" data-d="-1">− Electron</button>
+          <span class="sep"></span>
+          <button id="btnReset">Reset</button>
+          <button id="btnBack">← Table</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="right">
+      <div id="detail">
+        <h3>Element Data</h3>
+        <div class="sym" id="dSym">—</div>
+        <div class="name" id="dName">No selection</div>
+        <div class="row"><span class="lb">Atomic number (Z)</span><span id="dZ">—</span></div>
+        <div class="row"><span class="lb">Mass number (A)</span><span id="dA">—</span></div>
+        <div class="row"><span class="lb">Atomic mass</span><span id="dMass">—</span></div>
+        <div class="row"><span class="lb">Group / Period</span><span id="dGP">—</span></div>
+        <div class="row"><span class="lb">Protons</span><span id="dP">—</span></div>
+        <div class="row"><span class="lb">Neutrons</span><span id="dN">—</span></div>
+        <div class="row"><span class="lb">Electrons</span><span id="dE">—</span></div>
+        <div class="row"><span class="lb">Shells</span><span id="dSh">—</span></div>
+        <div class="row"><span class="lb">Configuration</span><span id="dCfg">—</span></div>
+        <div class="row"><span class="lb">Category</span><span id="dCat">—</span></div>
+        <div class="charge" id="dCh">—</div>
+        <div class="desc" id="dDesc">Point at or click an element.</div>
+      </div>
+      <div id="molPick">
+        <h3>Molecules</h3>
+        <button data-mol="H2O" class="on">H₂O — Water</button>
+        <button data-mol="CO2">CO₂ — Carbon dioxide</button>
+        <button data-mol="CH4">CH₄ — Methane</button>
+        <button data-mol="NH3">NH₃ — Ammonia</button>
+        <button data-mol="O2">O₂ — Oxygen</button>
+        <button data-mol="N2">N₂ — Nitrogen</button>
+        <button data-mol="NaCl">NaCl — Salt</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const CAT={alkali:'alkali',alkaline:'alkaline',transition:'transition',post:'post',metalloid:'metalloid',nonmetal:'nonmetal',halogen:'halogen',noble:'noble',lanth:'lanth',act:'act'};
+const CATN={alkali:'Alkali metal',alkaline:'Alkaline earth',transition:'Transition metal',post:'Post-transition',metalloid:'Metalloid',nonmetal:'Nonmetal',halogen:'Halogen',noble:'Noble gas',lanth:'Lanthanide',act:'Actinide'};
+const E=[
+{n:1,s:'H',name:'Hydrogen',mass:1.008,p:1,neut:0,e:1,cfg:'1s¹',g:1,per:1,x:1,y:1,c:CAT.nonmetal,sh:[1]},
+{n:2,s:'He',name:'Helium',mass:4.003,p:2,neut:2,e:2,cfg:'1s²',g:18,per:1,x:18,y:1,c:CAT.noble,sh:[2]},
+{n:3,s:'Li',name:'Lithium',mass:6.94,p:3,neut:4,e:3,cfg:'[He] 2s¹',g:1,per:2,x:1,y:2,c:CAT.alkali,sh:[2,1]},
+{n:4,s:'Be',name:'Beryllium',mass:9.012,p:4,neut:5,e:4,cfg:'[He] 2s²',g:2,per:2,x:2,y:2,c:CAT.alkaline,sh:[2,2]},
+{n:5,s:'B',name:'Boron',mass:10.81,p:5,neut:6,e:5,cfg:'[He] 2s² 2p¹',g:13,per:2,x:13,y:2,c:CAT.metalloid,sh:[2,3]},
+{n:6,s:'C',name:'Carbon',mass:12.011,p:6,neut:6,e:6,cfg:'[He] 2s² 2p²',g:14,per:2,x:14,y:2,c:CAT.nonmetal,sh:[2,4]},
+{n:7,s:'N',name:'Nitrogen',mass:14.007,p:7,neut:7,e:7,cfg:'[He] 2s² 2p³',g:15,per:2,x:15,y:2,c:CAT.nonmetal,sh:[2,5]},
+{n:8,s:'O',name:'Oxygen',mass:15.999,p:8,neut:8,e:8,cfg:'[He] 2s² 2p⁴',g:16,per:2,x:16,y:2,c:CAT.nonmetal,sh:[2,6]},
+{n:9,s:'F',name:'Fluorine',mass:18.998,p:9,neut:10,e:9,cfg:'[He] 2s² 2p⁵',g:17,per:2,x:17,y:2,c:CAT.halogen,sh:[2,7]},
+{n:10,s:'Ne',name:'Neon',mass:20.180,p:10,neut:10,e:10,cfg:'[He] 2s² 2p⁶',g:18,per:2,x:18,y:2,c:CAT.noble,sh:[2,8]},
+{n:11,s:'Na',name:'Sodium',mass:22.990,p:11,neut:12,e:11,cfg:'[Ne] 3s¹',g:1,per:3,x:1,y:3,c:CAT.alkali,sh:[2,8,1]},
+{n:12,s:'Mg',name:'Magnesium',mass:24.305,p:12,neut:12,e:12,cfg:'[Ne] 3s²',g:2,per:3,x:2,y:3,c:CAT.alkaline,sh:[2,8,2]},
+{n:13,s:'Al',name:'Aluminium',mass:26.982,p:13,neut:14,e:13,cfg:'[Ne] 3s² 3p¹',g:13,per:3,x:13,y:3,c:CAT.post,sh:[2,8,3]},
+{n:14,s:'Si',name:'Silicon',mass:28.085,p:14,neut:14,e:14,cfg:'[Ne] 3s² 3p²',g:14,per:3,x:14,y:3,c:CAT.metalloid,sh:[2,8,4]},
+{n:15,s:'P',name:'Phosphorus',mass:30.974,p:15,neut:16,e:15,cfg:'[Ne] 3s² 3p³',g:15,per:3,x:15,y:3,c:CAT.nonmetal,sh:[2,8,5]},
+{n:16,s:'S',name:'Sulfur',mass:32.06,p:16,neut:16,e:16,cfg:'[Ne] 3s² 3p⁴',g:16,per:3,x:16,y:3,c:CAT.nonmetal,sh:[2,8,6]},
+{n:17,s:'Cl',name:'Chlorine',mass:35.45,p:17,neut:18,e:17,cfg:'[Ne] 3s² 3p⁵',g:17,per:3,x:17,y:3,c:CAT.halogen,sh:[2,8,7]},
+{n:18,s:'Ar',name:'Argon',mass:39.948,p:18,neut:22,e:18,cfg:'[Ne] 3s² 3p⁶',g:18,per:3,x:18,y:3,c:CAT.noble,sh:[2,8,8]},
+{n:19,s:'K',name:'Potassium',mass:39.098,p:19,neut:20,e:19,cfg:'[Ar] 4s¹',g:1,per:4,x:1,y:4,c:CAT.alkali,sh:[2,8,8,1]},
+{n:20,s:'Ca',name:'Calcium',mass:40.078,p:20,neut:20,e:20,cfg:'[Ar] 4s²',g:2,per:4,x:2,y:4,c:CAT.alkaline,sh:[2,8,8,2]},
+{n:21,s:'Sc',name:'Scandium',mass:44.956,p:21,neut:24,e:21,cfg:'[Ar] 4s² 3d¹',g:3,per:4,x:3,y:4,c:CAT.transition,sh:[2,8,9,2]},
+{n:22,s:'Ti',name:'Titanium',mass:47.867,p:22,neut:26,e:22,cfg:'[Ar] 4s² 3d²',g:4,per:4,x:4,y:4,c:CAT.transition,sh:[2,8,10,2]},
+{n:23,s:'V',name:'Vanadium',mass:50.942,p:23,neut:28,e:23,cfg:'[Ar] 4s² 3d³',g:5,per:4,x:5,y:4,c:CAT.transition,sh:[2,8,11,2]},
+{n:24,s:'Cr',name:'Chromium',mass:51.996,p:24,neut:28,e:24,cfg:'[Ar] 4s¹ 3d⁵',g:6,per:4,x:6,y:4,c:CAT.transition,sh:[2,8,13,1]},
+{n:25,s:'Mn',name:'Manganese',mass:54.938,p:25,neut:30,e:25,cfg:'[Ar] 4s² 3d⁵',g:7,per:4,x:7,y:4,c:CAT.transition,sh:[2,8,13,2]},
+{n:26,s:'Fe',name:'Iron',mass:55.845,p:26,neut:30,e:26,cfg:'[Ar] 4s² 3d⁶',g:8,per:4,x:8,y:4,c:CAT.transition,sh:[2,8,14,2]},
+{n:27,s:'Co',name:'Cobalt',mass:58.933,p:27,neut:32,e:27,cfg:'[Ar] 4s² 3d⁷',g:9,per:4,x:9,y:4,c:CAT.transition,sh:[2,8,15,2]},
+{n:28,s:'Ni',name:'Nickel',mass:58.693,p:28,neut:31,e:28,cfg:'[Ar] 4s² 3d⁸',g:10,per:4,x:10,y:4,c:CAT.transition,sh:[2,8,16,2]},
+{n:29,s:'Cu',name:'Copper',mass:63.546,p:29,neut:35,e:29,cfg:'[Ar] 4s¹ 3d¹⁰',g:11,per:4,x:11,y:4,c:CAT.transition,sh:[2,8,18,1]},
+{n:30,s:'Zn',name:'Zinc',mass:65.38,p:30,neut:35,e:30,cfg:'[Ar] 4s² 3d¹⁰',g:12,per:4,x:12,y:4,c:CAT.transition,sh:[2,8,18,2]},
+{n:31,s:'Ga',name:'Gallium',mass:69.723,p:31,neut:39,e:31,cfg:'[Ar] 4s² 3d¹⁰ 4p¹',g:13,per:4,x:13,y:4,c:CAT.post,sh:[2,8,18,3]},
+{n:32,s:'Ge',name:'Germanium',mass:72.630,p:32,neut:41,e:32,cfg:'[Ar] 4s² 3d¹⁰ 4p²',g:14,per:4,x:14,y:4,c:CAT.metalloid,sh:[2,8,18,4]},
+{n:33,s:'As',name:'Arsenic',mass:74.922,p:33,neut:42,e:33,cfg:'[Ar] 4s² 3d¹⁰ 4p³',g:15,per:4,x:15,y:4,c:CAT.metalloid,sh:[2,8,18,5]},
+{n:34,s:'Se',name:'Selenium',mass:78.971,p:34,neut:45,e:34,cfg:'[Ar] 4s² 3d¹⁰ 4p⁴',g:16,per:4,x:16,y:4,c:CAT.nonmetal,sh:[2,8,18,6]},
+{n:35,s:'Br',name:'Bromine',mass:79.904,p:35,neut:45,e:35,cfg:'[Ar] 4s² 3d¹⁰ 4p⁵',g:17,per:4,x:17,y:4,c:CAT.halogen,sh:[2,8,18,7]},
+{n:36,s:'Kr',name:'Krypton',mass:83.798,p:36,neut:48,e:36,cfg:'[Ar] 4s² 3d¹⁰ 4p⁶',g:18,per:4,x:18,y:4,c:CAT.noble,sh:[2,8,18,8]},
+{n:37,s:'Rb',name:'Rubidium',mass:85.468,p:37,neut:48,e:37,cfg:'[Kr] 5s¹',g:1,per:5,x:1,y:5,c:CAT.alkali,sh:[2,8,18,8,1]},
+{n:38,s:'Sr',name:'Strontium',mass:87.62,p:38,neut:50,e:38,cfg:'[Kr] 5s²',g:2,per:5,x:2,y:5,c:CAT.alkaline,sh:[2,8,18,8,2]},
+{n:39,s:'Y',name:'Yttrium',mass:88.906,p:39,neut:50,e:39,cfg:'[Kr] 5s² 4d¹',g:3,per:5,x:3,y:5,c:CAT.transition,sh:[2,8,18,9,2]},
+{n:40,s:'Zr',name:'Zirconium',mass:91.224,p:40,neut:51,e:40,cfg:'[Kr] 5s² 4d²',g:4,per:5,x:4,y:5,c:CAT.transition,sh:[2,8,18,10,2]},
+{n:41,s:'Nb',name:'Niobium',mass:92.906,p:41,neut:52,e:41,cfg:'[Kr] 5s¹ 4d⁴',g:5,per:5,x:5,y:5,c:CAT.transition,sh:[2,8,18,12,1]},
+{n:42,s:'Mo',name:'Molybdenum',mass:95.95,p:42,neut:54,e:42,cfg:'[Kr] 5s¹ 4d⁵',g:6,per:5,x:6,y:5,c:CAT.transition,sh:[2,8,18,13,1]},
+{n:43,s:'Tc',name:'Technetium',mass:98,p:43,neut:55,e:43,cfg:'[Kr] 5s² 4d⁵',g:7,per:5,x:7,y:5,c:CAT.transition,sh:[2,8,18,13,2]},
+{n:44,s:'Ru',name:'Ruthenium',mass:101.07,p:44,neut:57,e:44,cfg:'[Kr] 5s¹ 4d⁷',g:8,per:5,x:8,y:5,c:CAT.transition,sh:[2,8,18,15,1]},
+{n:45,s:'Rh',name:'Rhodium',mass:102.91,p:45,neut:58,e:45,cfg:'[Kr] 5s¹ 4d⁸',g:9,per:5,x:9,y:5,c:CAT.transition,sh:[2,8,18,16,1]},
+{n:46,s:'Pd',name:'Palladium',mass:106.42,p:46,neut:60,e:46,cfg:'[Kr] 4d¹⁰',g:10,per:5,x:10,y:5,c:CAT.transition,sh:[2,8,18,18]},
+{n:47,s:'Ag',name:'Silver',mass:107.87,p:47,neut:61,e:47,cfg:'[Kr] 5s¹ 4d¹⁰',g:11,per:5,x:11,y:5,c:CAT.transition,sh:[2,8,18,18,1]},
+{n:48,s:'Cd',name:'Cadmium',mass:112.41,p:48,neut:64,e:48,cfg:'[Kr] 5s² 4d¹⁰',g:12,per:5,x:12,y:5,c:CAT.transition,sh:[2,8,18,18,2]},
+{n:49,s:'In',name:'Indium',mass:114.82,p:49,neut:66,e:49,cfg:'[Kr] 5s² 4d¹⁰ 5p¹',g:13,per:5,x:13,y:5,c:CAT.post,sh:[2,8,18,18,3]},
+{n:50,s:'Sn',name:'Tin',mass:118.71,p:50,neut:69,e:50,cfg:'[Kr] 5s² 4d¹⁰ 5p²',g:14,per:5,x:14,y:5,c:CAT.post,sh:[2,8,18,18,4]},
+{n:51,s:'Sb',name:'Antimony',mass:121.76,p:51,neut:71,e:51,cfg:'[Kr] 5s² 4d¹⁰ 5p³',g:15,per:5,x:15,y:5,c:CAT.metalloid,sh:[2,8,18,18,5]},
+{n:52,s:'Te',name:'Tellurium',mass:127.60,p:52,neut:76,e:52,cfg:'[Kr] 5s² 4d¹⁰ 5p⁴',g:16,per:5,x:16,y:5,c:CAT.metalloid,sh:[2,8,18,18,6]},
+{n:53,s:'I',name:'Iodine',mass:126.90,p:53,neut:74,e:53,cfg:'[Kr] 5s² 4d¹⁰ 5p⁵',g:17,per:5,x:17,y:5,c:CAT.halogen,sh:[2,8,18,18,7]},
+{n:54,s:'Xe',name:'Xenon',mass:131.29,p:54,neut:77,e:54,cfg:'[Kr] 5s² 4d¹⁰ 5p⁶',g:18,per:5,x:18,y:5,c:CAT.noble,sh:[2,8,18,18,8]},
+{n:55,s:'Cs',name:'Caesium',mass:132.91,p:55,neut:78,e:55,cfg:'[Xe] 6s¹',g:1,per:6,x:1,y:6,c:CAT.alkali,sh:[2,8,18,18,8,1]},
+{n:56,s:'Ba',name:'Barium',mass:137.33,p:56,neut:81,e:56,cfg:'[Xe] 6s²',g:2,per:6,x:2,y:6,c:CAT.alkaline,sh:[2,8,18,18,8,2]},
+{n:57,s:'La',name:'Lanthanum',mass:138.91,p:57,neut:82,e:57,cfg:'[Xe] 6s² 5d¹',g:3,per:6,x:3,y:8,c:CAT.lanth,sh:[2,8,18,18,9,2]},
+{n:58,s:'Ce',name:'Cerium',mass:140.12,p:58,neut:82,e:58,cfg:'[Xe] 6s² 4f¹ 5d¹',g:0,per:6,x:4,y:8,c:CAT.lanth,sh:[2,8,18,19,9,2]},
+{n:59,s:'Pr',name:'Praseodymium',mass:140.91,p:59,neut:82,e:59,cfg:'[Xe] 6s² 4f³',g:0,per:6,x:5,y:8,c:CAT.lanth,sh:[2,8,18,21,8,2]},
+{n:60,s:'Nd',name:'Neodymium',mass:144.24,p:60,neut:84,e:60,cfg:'[Xe] 6s² 4f⁴',g:0,per:6,x:6,y:8,c:CAT.lanth,sh:[2,8,18,22,8,2]},
+{n:61,s:'Pm',name:'Promethium',mass:145,p:61,neut:84,e:61,cfg:'[Xe] 6s² 4f⁵',g:0,per:6,x:7,y:8,c:CAT.lanth,sh:[2,8,18,23,8,2]},
+{n:62,s:'Sm',name:'Samarium',mass:150.36,p:62,neut:88,e:62,cfg:'[Xe] 6s² 4f⁶',g:0,per:6,x:8,y:8,c:CAT.lanth,sh:[2,8,18,24,8,2]},
+{n:63,s:'Eu',name:'Europium',mass:151.96,p:63,neut:89,e:63,cfg:'[Xe] 6s² 4f⁷',g:0,per:6,x:9,y:8,c:CAT.lanth,sh:[2,8,18,25,8,2]},
+{n:64,s:'Gd',name:'Gadolinium',mass:157.25,p:64,neut:93,e:64,cfg:'[Xe] 6s² 4f⁷ 5d¹',g:0,per:6,x:10,y:8,c:CAT.lanth,sh:[2,8,18,25,9,2]},
+{n:65,s:'Tb',name:'Terbium',mass:158.93,p:65,neut:94,e:65,cfg:'[Xe] 6s² 4f⁹',g:0,per:6,x:11,y:8,c:CAT.lanth,sh:[2,8,18,27,8,2]},
+{n:66,s:'Dy',name:'Dysprosium',mass:162.50,p:66,neut:97,e:66,cfg:'[Xe] 6s² 4f¹⁰',g:0,per:6,x:12,y:8,c:CAT.lanth,sh:[2,8,18,28,8,2]},
+{n:67,s:'Ho',name:'Holmium',mass:164.93,p:67,neut:98,e:67,cfg:'[Xe] 6s² 4f¹¹',g:0,per:6,x:13,y:8,c:CAT.lanth,sh:[2,8,18,29,8,2]},
+{n:68,s:'Er',name:'Erbium',mass:167.26,p:68,neut:99,e:68,cfg:'[Xe] 6s² 4f¹²',g:0,per:6,x:14,y:8,c:CAT.lanth,sh:[2,8,18,30,8,2]},
+{n:69,s:'Tm',name:'Thulium',mass:168.93,p:69,neut:100,e:69,cfg:'[Xe] 6s² 4f¹³',g:0,per:6,x:15,y:8,c:CAT.lanth,sh:[2,8,18,31,8,2]},
+{n:70,s:'Yb',name:'Ytterbium',mass:173.05,p:70,neut:103,e:70,cfg:'[Xe] 6s² 4f¹⁴',g:0,per:6,x:16,y:8,c:CAT.lanth,sh:[2,8,18,32,8,2]},
+{n:71,s:'Lu',name:'Lutetium',mass:174.97,p:71,neut:104,e:71,cfg:'[Xe] 6s² 4f¹⁴ 5d¹',g:3,per:6,x:17,y:8,c:CAT.lanth,sh:[2,8,18,32,9,2]},
+{n:72,s:'Hf',name:'Hafnium',mass:178.49,p:72,neut:106,e:72,cfg:'[Xe] 6s² 4f¹⁴ 5d²',g:4,per:6,x:4,y:6,c:CAT.transition,sh:[2,8,18,32,10,2]},
+{n:73,s:'Ta',name:'Tantalum',mass:180.95,p:73,neut:108,e:73,cfg:'[Xe] 6s² 4f¹⁴ 5d³',g:5,per:6,x:5,y:6,c:CAT.transition,sh:[2,8,18,32,11,2]},
+{n:74,s:'W',name:'Tungsten',mass:183.84,p:74,neut:110,e:74,cfg:'[Xe] 6s² 4f¹⁴ 5d⁴',g:6,per:6,x:6,y:6,c:CAT.transition,sh:[2,8,18,32,12,2]},
+{n:75,s:'Re',name:'Rhenium',mass:186.21,p:75,neut:111,e:75,cfg:'[Xe] 6s² 4f¹⁴ 5d⁵',g:7,per:6,x:7,y:6,c:CAT.transition,sh:[2,8,18,32,13,2]},
+{n:76,s:'Os',name:'Osmium',mass:190.23,p:76,neut:114,e:76,cfg:'[Xe] 6s² 4f¹⁴ 5d⁶',g:8,per:6,x:8,y:6,c:CAT.transition,sh:[2,8,18,32,14,2]},
+{n:77,s:'Ir',name:'Iridium',mass:192.22,p:77,neut:115,e:77,cfg:'[Xe] 6s² 4f¹⁴ 5d⁷',g:9,per:6,x:9,y:6,c:CAT.transition,sh:[2,8,18,32,15,2]},
+{n:78,s:'Pt',name:'Platinum',mass:195.08,p:78,neut:117,e:78,cfg:'[Xe] 6s¹ 4f¹⁴ 5d⁹',g:10,per:6,x:10,y:6,c:CAT.transition,sh:[2,8,18,32,17,1]},
+{n:79,s:'Au',name:'Gold',mass:196.97,p:79,neut:118,e:79,cfg:'[Xe] 6s¹ 4f¹⁴ 5d¹⁰',g:11,per:6,x:11,y:6,c:CAT.transition,sh:[2,8,18,32,18,1]},
+{n:80,s:'Hg',name:'Mercury',mass:200.59,p:80,neut:121,e:80,cfg:'[Xe] 6s² 4f¹⁴ 5d¹⁰',g:12,per:6,x:12,y:6,c:CAT.transition,sh:[2,8,18,32,18,2]},
+{n:81,s:'Tl',name:'Thallium',mass:204.38,p:81,neut:123,e:81,cfg:'[Xe] 6s² 4f¹⁴ 5d¹⁰ 6p¹',g:13,per:6,x:13,y:6,c:CAT.post,sh:[2,8,18,32,18,3]},
+{n:82,s:'Pb',name:'Lead',mass:207.2,p:82,neut:125,e:82,cfg:'[Xe] 6s² 4f¹⁴ 5d¹⁰ 6p²',g:14,per:6,x:14,y:6,c:CAT.post,sh:[2,8,18,32,18,4]},
+{n:83,s:'Bi',name:'Bismuth',mass:208.98,p:83,neut:126,e:83,cfg:'[Xe] 6s² 4f¹⁴ 5d¹⁰ 6p³',g:15,per:6,x:15,y:6,c:CAT.post,sh:[2,8,18,32,18,5]},
+{n:84,s:'Po',name:'Polonium',mass:209,p:84,neut:125,e:84,cfg:'[Xe] 6s² 4f¹⁴ 5d¹⁰ 6p⁴',g:16,per:6,x:16,y:6,c:CAT.post,sh:[2,8,18,32,18,6]},
+{n:85,s:'At',name:'Astatine',mass:210,p:85,neut:125,e:85,cfg:'[Xe] 6s² 4f¹⁴ 5d¹⁰ 6p⁵',g:17,per:6,x:17,y:6,c:CAT.halogen,sh:[2,8,18,32,18,7]},
+{n:86,s:'Rn',name:'Radon',mass:222,p:86,neut:136,e:86,cfg:'[Xe] 6s² 4f¹⁴ 5d¹⁰ 6p⁶',g:18,per:6,x:18,y:6,c:CAT.noble,sh:[2,8,18,32,18,8]},
+{n:87,s:'Fr',name:'Francium',mass:223,p:87,neut:136,e:87,cfg:'[Rn] 7s¹',g:1,per:7,x:1,y:7,c:CAT.alkali,sh:[2,8,18,32,18,8,1]},
+{n:88,s:'Ra',name:'Radium',mass:226,p:88,neut:138,e:88,cfg:'[Rn] 7s²',g:2,per:7,x:2,y:7,c:CAT.alkaline,sh:[2,8,18,32,18,8,2]},
+{n:89,s:'Ac',name:'Actinium',mass:227,p:89,neut:138,e:89,cfg:'[Rn] 7s² 6d¹',g:3,per:7,x:3,y:9,c:CAT.act,sh:[2,8,18,32,18,9,2]},
+{n:90,s:'Th',name:'Thorium',mass:232.04,p:90,neut:142,e:90,cfg:'[Rn] 7s² 6d²',g:0,per:7,x:4,y:9,c:CAT.act,sh:[2,8,18,32,18,10,2]},
+{n:91,s:'Pa',name:'Protactinium',mass:231.04,p:91,neut:140,e:91,cfg:'[Rn] 7s² 5f² 6d¹',g:0,per:7,x:5,y:9,c:CAT.act,sh:[2,8,18,32,20,9,2]},
+{n:92,s:'U',name:'Uranium',mass:238.03,p:92,neut:146,e:92,cfg:'[Rn] 7s² 5f³ 6d¹',g:0,per:7,x:6,y:9,c:CAT.act,sh:[2,8,18,32,21,9,2]},
+{n:93,s:'Np',name:'Neptunium',mass:237,p:93,neut:144,e:93,cfg:'[Rn] 7s² 5f⁴ 6d¹',g:0,per:7,x:7,y:9,c:CAT.act,sh:[2,8,18,32,22,9,2]},
+{n:94,s:'Pu',name:'Plutonium',mass:244,p:94,neut:150,e:94,cfg:'[Rn] 7s² 5f⁶',g:0,per:7,x:8,y:9,c:CAT.act,sh:[2,8,18,32,24,8,2]},
+{n:95,s:'Am',name:'Americium',mass:243,p:95,neut:148,e:95,cfg:'[Rn] 7s² 5f⁷',g:0,per:7,x:9,y:9,c:CAT.act,sh:[2,8,18,32,25,8,2]},
+{n:96,s:'Cm',name:'Curium',mass:247,p:96,neut:151,e:96,cfg:'[Rn] 7s² 5f⁷ 6d¹',g:0,per:7,x:10,y:9,c:CAT.act,sh:[2,8,18,32,25,9,2]},
+{n:97,s:'Bk',name:'Berkelium',mass:247,p:97,neut:150,e:97,cfg:'[Rn] 7s² 5f⁹',g:0,per:7,x:11,y:9,c:CAT.act,sh:[2,8,18,32,27,8,2]},
+{n:98,s:'Cf',name:'Californium',mass:251,p:98,neut:153,e:98,cfg:'[Rn] 7s² 5f¹⁰',g:0,per:7,x:12,y:9,c:CAT.act,sh:[2,8,18,32,28,8,2]},
+{n:99,s:'Es',name:'Einsteinium',mass:252,p:99,neut:153,e:99,cfg:'[Rn] 7s² 5f¹¹',g:0,per:7,x:13,y:9,c:CAT.act,sh:[2,8,18,32,29,8,2]},
+{n:100,s:'Fm',name:'Fermium',mass:257,p:100,neut:157,e:100,cfg:'[Rn] 7s² 5f¹²',g:0,per:7,x:14,y:9,c:CAT.act,sh:[2,8,18,32,30,8,2]},
+{n:101,s:'Md',name:'Mendelevium',mass:258,p:101,neut:157,e:101,cfg:'[Rn] 7s² 5f¹³',g:0,per:7,x:15,y:9,c:CAT.act,sh:[2,8,18,32,31,8,2]},
+{n:102,s:'No',name:'Nobelium',mass:259,p:102,neut:157,e:102,cfg:'[Rn] 7s² 5f¹⁴',g:0,per:7,x:16,y:9,c:CAT.act,sh:[2,8,18,32,32,8,2]},
+{n:103,s:'Lr',name:'Lawrencium',mass:266,p:103,neut:163,e:103,cfg:'[Rn] 7s² 5f¹⁴ 7p¹',g:3,per:7,x:17,y:9,c:CAT.act,sh:[2,8,18,32,32,8,3]},
+{n:104,s:'Rf',name:'Rutherfordium',mass:267,p:104,neut:163,e:104,cfg:'[Rn] 7s² 5f¹⁴ 6d²',g:4,per:7,x:4,y:7,c:CAT.transition,sh:[2,8,18,32,32,10,2]},
+{n:105,s:'Db',name:'Dubnium',mass:268,p:105,neut:163,e:105,cfg:'[Rn] 7s² 5f¹⁴ 6d³',g:5,per:7,x:5,y:7,c:CAT.transition,sh:[2,8,18,32,32,11,2]},
+{n:106,s:'Sg',name:'Seaborgium',mass:269,p:106,neut:163,e:106,cfg:'[Rn] 7s² 5f¹⁴ 6d⁴',g:6,per:7,x:6,y:7,c:CAT.transition,sh:[2,8,18,32,32,12,2]},
+{n:107,s:'Bh',name:'Bohrium',mass:270,p:107,neut:163,e:107,cfg:'[Rn] 7s² 5f¹⁴ 6d⁵',g:7,per:7,x:7,y:7,c:CAT.transition,sh:[2,8,18,32,32,13,2]},
+{n:108,s:'Hs',name:'Hassium',mass:269,p:108,neut:161,e:108,cfg:'[Rn] 7s² 5f¹⁴ 6d⁶',g:8,per:7,x:8,y:7,c:CAT.transition,sh:[2,8,18,32,32,14,2]},
+{n:109,s:'Mt',name:'Meitnerium',mass:278,p:109,neut:169,e:109,cfg:'[Rn] 7s² 5f¹⁴ 6d⁷',g:9,per:7,x:9,y:7,c:CAT.transition,sh:[2,8,18,32,32,15,2]},
+{n:110,s:'Ds',name:'Darmstadtium',mass:281,p:110,neut:171,e:110,cfg:'[Rn] 7s² 5f¹⁴ 6d⁸',g:10,per:7,x:10,y:7,c:CAT.transition,sh:[2,8,18,32,32,16,2]},
+{n:111,s:'Rg',name:'Roentgenium',mass:282,p:111,neut:171,e:111,cfg:'[Rn] 7s² 5f¹⁴ 6d⁹',g:11,per:7,x:11,y:7,c:CAT.transition,sh:[2,8,18,32,32,17,2]},
+{n:112,s:'Cn',name:'Copernicium',mass:285,p:112,neut:173,e:112,cfg:'[Rn] 7s² 5f¹⁴ 6d¹⁰',g:12,per:7,x:12,y:7,c:CAT.transition,sh:[2,8,18,32,32,18,2]},
+{n:113,s:'Nh',name:'Nihonium',mass:286,p:113,neut:173,e:113,cfg:'[Rn] 7s² 5f¹⁴ 6d¹⁰ 7p¹',g:13,per:7,x:13,y:7,c:CAT.post,sh:[2,8,18,32,32,18,3]},
+{n:114,s:'Fl',name:'Flerovium',mass:289,p:114,neut:175,e:114,cfg:'[Rn] 7s² 5f¹⁴ 6d¹⁰ 7p²',g:14,per:7,x:14,y:7,c:CAT.post,sh:[2,8,18,32,32,18,4]},
+{n:115,s:'Mc',name:'Moscovium',mass:290,p:115,neut:175,e:115,cfg:'[Rn] 7s² 5f¹⁴ 6d¹⁰ 7p³',g:15,per:7,x:15,y:7,c:CAT.post,sh:[2,8,18,32,32,18,5]},
+{n:116,s:'Lv',name:'Livermorium',mass:293,p:116,neut:177,e:116,cfg:'[Rn] 7s² 5f¹⁴ 6d¹⁰ 7p⁴',g:16,per:7,x:16,y:7,c:CAT.post,sh:[2,8,18,32,32,18,6]},
+{n:117,s:'Ts',name:'Tennessine',mass:294,p:117,neut:177,e:117,cfg:'[Rn] 7s² 5f¹⁴ 6d¹⁰ 7p⁵',g:17,per:7,x:17,y:7,c:CAT.halogen,sh:[2,8,18,32,32,18,7]},
+{n:118,s:'Og',name:'Oganesson',mass:294,p:118,neut:176,e:118,cfg:'[Rn] 7s² 5f¹⁴ 6d¹⁰ 7p⁶',g:18,per:7,x:18,y:7,c:CAT.noble,sh:[2,8,18,32,32,18,8]}
+];
+const byN=Object.fromEntries(E.map(e=>[e.n,e]));
+
+const MOLS={
+H2O:{name:'Water',f:'H₂O',mass:18.015,atoms:[{el:'O',p:[0,0,0],c:0xef4444},{el:'H',p:[.96,0,0],c:0xf8fafc},{el:'H',p:[-.24,.93,0],c:0xf8fafc}],bonds:[[0,1],[0,2]]},
+CO2:{name:'Carbon dioxide',f:'CO₂',mass:44.01,atoms:[{el:'C',p:[0,0,0],c:0x64748b},{el:'O',p:[1.16,0,0],c:0xef4444},{el:'O',p:[-1.16,0,0],c:0xef4444}],bonds:[[0,1],[0,2]]},
+CH4:{name:'Methane',f:'CH₄',mass:16.04,atoms:[{el:'C',p:[0,0,0],c:0x64748b},{el:'H',p:[.63,.63,.63],c:0xf8fafc},{el:'H',p:[-.63,-.63,.63],c:0xf8fafc},{el:'H',p:[-.63,.63,-.63],c:0xf8fafc},{el:'H',p:[.63,-.63,-.63],c:0xf8fafc}],bonds:[[0,1],[0,2],[0,3],[0,4]]},
+NH3:{name:'Ammonia',f:'NH₃',mass:17.03,atoms:[{el:'N',p:[0,.12,0],c:0x3b82f6},{el:'H',p:[.94,-.28,0],c:0xf8fafc},{el:'H',p:[-.47,-.28,.81],c:0xf8fafc},{el:'H',p:[-.47,-.28,-.81],c:0xf8fafc}],bonds:[[0,1],[0,2],[0,3]]},
+O2:{name:'Oxygen',f:'O₂',mass:32,atoms:[{el:'O',p:[-.6,0,0],c:0xef4444},{el:'O',p:[.6,0,0],c:0xef4444}],bonds:[[0,1]]},
+N2:{name:'Nitrogen',f:'N₂',mass:28.01,atoms:[{el:'N',p:[-.55,0,0],c:0x3b82f6},{el:'N',p:[.55,0,0],c:0x3b82f6}],bonds:[[0,1]]},
+NaCl:{name:'Sodium chloride',f:'NaCl',mass:58.44,atoms:[{el:'Na',p:[-1.2,0,0],c:0xa78bfa},{el:'Cl',p:[1.2,0,0],c:0x34d399}],bonds:[[0,1]]}
+};
+
+let mode='table',selected=null,st={p:0,n:0,e:0};
+let hover=null,hoverT=0,lastG='none',gAt=0;
+let handX=0.5,handY=0.5,prevHX=0.5,prevHY=0.5;
+let pinchDist=0,basePinch=0,hasBasePinch=false;
+let rotY=0,rotX=0;
+
+const boot=document.getElementById('boot'),startBtn=document.getElementById('startBtn'),msg=document.getElementById('msg');
+const app=document.getElementById('app'),video=document.getElementById('video'),cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const cursor=document.getElementById('cursor'),grid=document.getElementById('grid'),toast=document.getElementById('toast');
+const tableView=document.getElementById('tableView'),atomView=document.getElementById('atomView'),atomBar=document.getElementById('atomBar');
+
+function toastMsg(t){toast.textContent=t;toast.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>toast.classList.remove('show'),1200)}
+
+function buildGrid(){
+  grid.innerHTML='';
+  // 9 rows: periods 1-7 + lanthanides + actinides
+  const ROWS=9;
+  for(let y=1;y<=ROWS;y++)for(let x=1;x<=18;x++){
+    const d=document.createElement('div');
+    d.className='cell empty';
+    grid.appendChild(d);
+  }
+  // Spacer markers for f-block alignment (optional labels)
+  E.forEach(el=>{
+    const i=(el.y-1)*18+(el.x-1);
+    const c=grid.children[i];
+    if(!c) return;
+    c.className='cell '+el.c;
+    c.dataset.n=el.n;
+    c.innerHTML=`<span class="n">${el.n}</span><span class="s">${el.s}</span>`;
+  });
+}
+buildGrid();
+
+function showDetail(el,s){
+  if(!el)return;s=s||{p:el.p,n:el.neut,e:el.e};
+  document.getElementById('dSym').textContent=el.s;
+  document.getElementById('dName').textContent=el.name;
+  document.getElementById('dZ').textContent=s.p;
+  document.getElementById('dA').textContent=s.p+s.n;
+  document.getElementById('dMass').textContent=el.mass;
+  document.getElementById('dGP').textContent=el.g+' / '+el.per;
+  document.getElementById('dP').textContent=s.p;
+  document.getElementById('dN').textContent=s.n;
+  document.getElementById('dE').textContent=s.e;
+  document.getElementById('dSh').textContent=(el.sh||[]).join(' · ');
+  document.getElementById('dCfg').textContent=el.cfg;
+  document.getElementById('dCat').textContent=CATN[el.c]||'';
+  const ch=s.p-s.e,ce=document.getElementById('dCh');
+  if(ch>0){ce.textContent=el.s+(ch>1?ch:'')+'⁺  cation';ce.className='charge pos'}
+  else if(ch<0){ce.textContent=el.s+(Math.abs(ch)>1?Math.abs(ch):'')+'⁻  anion';ce.className='charge neg'}
+  else{ce.textContent='Neutral atom';ce.className='charge'}
+  document.getElementById('dDesc').textContent=`${el.name}: Z=${s.p}, A=${s.p+s.n}. Shells: ${(el.sh||[]).join(', ')}.`;
+  document.getElementById('hudTitle').textContent=`${el.name} (${el.s})`;
+  document.getElementById('hudP').textContent=s.p;
+  document.getElementById('hudN').textContent=s.n;
+  document.getElementById('hudE').textContent=s.e;
+  document.getElementById('hudA').textContent=s.p+s.n;
+  document.querySelectorAll('.cell').forEach(c=>c.classList.remove('sel'));
+  const cell=document.querySelector('.cell[data-n="'+el.n+'"]');if(cell)cell.classList.add('sel');
+}
+
+/* THREE — Bohr model */
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x0a0a0f);
+const camera=new THREE.PerspectiveCamera(45,1,.1,100);camera.position.set(0,0,9);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;
+atomView.appendChild(renderer.domElement);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.dampingFactor=0.08;controls.minDistance=3;controls.maxDistance=24;controls.enablePan=false;
+
+scene.add(new THREE.AmbientLight(0xffffff,0.55));
+const key=new THREE.DirectionalLight(0xffffff,0.7);key.position.set(4,6,8);scene.add(key);
+const fill=new THREE.DirectionalLight(0x88aaff,0.25);fill.position.set(-5,2,-4);scene.add(fill);
+
+const atomG=new THREE.Group(),molG=new THREE.Group();scene.add(atomG);scene.add(molG);molG.visible=false;
+const matP=new THREE.MeshStandardMaterial({color:0xe53935,emissive:0xb71c1c,emissiveIntensity:0.35,metalness:0.15,roughness:0.4});
+const matN=new THREE.MeshStandardMaterial({color:0x1e88e5,emissive:0x0d47a1,emissiveIntensity:0.3,metalness:0.15,roughness:0.4});
+const matE=new THREE.MeshStandardMaterial({color:0xffd54f,emissive:0xffc107,emissiveIntensity:0.55,metalness:0.1,roughness:0.3});
+const matRing=new THREE.LineBasicMaterial({color:0x90a4ae,transparent:true,opacity:0.55});
+let electrons=[];
+
+function clearG(g){while(g.children.length){const o=g.children[0];g.remove(o);if(o.geometry)o.geometry.dispose()}}
+function buildBohr(){
+  clearG(atomG);electrons=[];
+  const tot=st.p+st.n,nR=Math.max(0.35,Math.cbrt(tot)*0.18);
+  for(let i=0;i<st.p;i++){const m=new THREE.Mesh(new THREE.SphereGeometry(0.14,16,16),matP);const th=Math.random()*6.28,ph=Math.acos(2*Math.random()-1),r=nR*Math.random()*0.85;m.position.set(r*Math.sin(ph)*Math.cos(th),r*Math.sin(ph)*Math.sin(th),r*Math.cos(ph));atomG.add(m)}
+  for(let i=0;i<st.n;i++){const m=new THREE.Mesh(new THREE.SphereGeometry(0.135,16,16),matN);const th=Math.random()*6.28,ph=Math.acos(2*Math.random()-1),r=nR*Math.random()*0.9;m.position.set(r*Math.sin(ph)*Math.cos(th),r*Math.sin(ph)*Math.sin(th),r*Math.cos(ph));atomG.add(m)}
+  const caps=[2,8,18,32,32,18,8];let rem=st.e,si=0;
+  while(rem>0&&si<caps.length){
+    const cnt=Math.min(rem,caps[si]),sr=1.4+si*1.05;
+    const pts=[];for(let a=0;a<=96;a++){const ang=a/96*6.28;pts.push(new THREE.Vector3(sr*Math.cos(ang),sr*Math.sin(ang),0))}
+    atomG.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts),matRing.clone()));
+    for(let i=0;i<cnt;i++){const ang=i/cnt*6.28+si*0.3;const m=new THREE.Mesh(new THREE.SphereGeometry(0.1,12,12),matE);m.userData={r:sr,a:ang,spd:0.25+si*0.04};m.position.set(sr*Math.cos(ang),sr*Math.sin(ang),0);atomG.add(m);electrons.push(m)}
+    rem-=cnt;si++;
+  }
+  showDetail(selected,st);
+}
+function loadAtom(el){selected=el;st={p:el.p,n:el.neut,e:el.e};buildBohr()}
+function buildMol(key){
+  clearG(molG);const mol=MOLS[key];if(!mol)return;const sc=1.4,ms=[];
+  mol.atoms.forEach(a=>{const r=a.el==='H'?0.26:0.4;const mat=new THREE.MeshStandardMaterial({color:a.c,emissive:a.c,emissiveIntensity:0.2,metalness:0.15,roughness:0.4});const m=new THREE.Mesh(new THREE.SphereGeometry(r,20,20),mat);m.position.set(a.p[0]*sc,a.p[1]*sc,a.p[2]*sc);molG.add(m);ms.push(m)});
+  mol.bonds.forEach(([i,j])=>{const a=ms[i].position,b=ms[j].position;const dir=new THREE.Vector3().subVectors(b,a);const len=dir.length();const mid=new THREE.Vector3().addVectors(a,b).multiplyScalar(0.5);const cyl=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,len,10),new THREE.MeshStandardMaterial({color:0x94a3b8}));cyl.position.copy(mid);cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.normalize());molG.add(cyl)});
+  document.getElementById('dSym').textContent=mol.f;document.getElementById('dName').textContent=mol.name;document.getElementById('dMass').textContent=mol.mass+' g/mol';document.getElementById('dCh').textContent='Molecule';document.getElementById('dCh').className='charge';
+  document.getElementById('hudTitle').textContent=mol.f+' — '+mol.name;document.getElementById('hudP').textContent='—';document.getElementById('hudN').textContent='—';document.getElementById('hudE').textContent='—';document.getElementById('hudA').textContent=mol.mass;
+}
+
+function setMode(m){
+  mode=m;
+  document.querySelectorAll('#modes button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  document.getElementById('stMode').textContent=m==='table'?'Table':m==='atom'?'Atom':'Molecule';
+  tableView.style.display=m==='table'?'flex':'none';
+  atomView.style.display=(m==='atom'||m==='mol')?'block':'none';
+  atomBar.style.display=m==='atom'?'flex':'none';
+  document.getElementById('molPick').style.display=m==='mol'?'block':'none';
+  atomG.visible=m==='atom';molG.visible=m==='mol';
+  hasBasePinch=false;
+  if(m==='atom'){if(selected)loadAtom(selected);else loadAtom(byN[8]);resize3()}
+  if(m==='mol'){buildMol('H2O');resize3()}
+  if(m==='atom'||m==='mol'){camera.position.set(0,0,9);controls.target.set(0,0,0);rotX=0;rotY=0;atomG.rotation.set(0,0,0);molG.rotation.set(0,0,0);controls.update()}
+}
+document.querySelectorAll('#modes button').forEach(b => {
+  b.addEventListener('click', ev => {
+    ev.preventDefault();
+    setMode(b.dataset.m);
+  });
+});
+document.getElementById('btnBack').onclick=()=>setMode('table');
+document.getElementById('btnReset').onclick=()=>{if(selected)loadAtom(selected)};
+document.querySelectorAll('#atomBar button[data-k]').forEach(b=>{
+  b.onclick=()=>{const k=b.dataset.k,d=+b.dataset.d;if(k==='p')st.p=Math.max(1,st.p+d);if(k==='n')st.n=Math.max(0,st.n+d);if(k==='e')st.e=Math.max(0,st.e+d);buildBohr()};
+});
+document.querySelectorAll('#molPick button').forEach(b=>{
+  b.onclick=()=>{document.querySelectorAll('#molPick button').forEach(x=>x.classList.remove('on'));b.classList.add('on');buildMol(b.dataset.mol)};
+});
+
+function selectElement(el){
+  if(!el) return;
+  selected = el;
+  showDetail(el);
+}
+function openAtom(){
+  if(!selected) selected = byN[8];
+  setMode('atom');
+  toastMsg('Atomic Structure: ' + selected.name);
+}
+grid.addEventListener('click', e => {
+  const c = e.target.closest('.cell');
+  if(!c || !c.dataset.n) return;
+  e.preventDefault();
+  e.stopPropagation();
+  selectElement(byN[+c.dataset.n]);
+});
+grid.addEventListener('dblclick', e => {
+  const c = e.target.closest('.cell');
+  if(!c || !c.dataset.n) return;
+  e.preventDefault();
+  selectElement(byN[+c.dataset.n]);
+  openAtom();
+});
+// Also click on tableView empty areas ignored
+
+
+function resize3(){const w=atomView.clientWidth||innerWidth,h=atomView.clientHeight||innerHeight;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h)}
+addEventListener('resize',()=>{if(mode!=='table')resize3()});
+
+/* ========== ACCURATE GESTURE SYSTEM ========== */
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+
+function classify(lms){
+  if(!lms||lms.length<21)return 'none';
+  const w=lms[0], t=lms[4], i=lms[8], m=lms[12], r=lms[16], p=lms[20];
+  const ip=lms[6], mp=lms[10], rp=lms[14], pp=lms[18], tMcp=lms[2];
+
+  function isExt(tip,pip){return dist(w,tip) > dist(w,pip)*1.18}
+  const iExt=isExt(i,ip), mExt=isExt(m,mp), rExt=isExt(r,rp), pExt=isExt(p,pp);
+  const fingers=[i,m,r,p];
+  // Curl: tip close to wrist
+  const curlCount = fingers.filter(f => dist(w,f) < 0.16).length;
+  const allCurl = curlCount >= 3;
+  const allExt = iExt && mExt && rExt && pExt;
+  const pinch = dist(t,i);
+  const thumbLen = dist(w,t);
+  const thumbExt = thumbLen > 0.16;
+
+  // FIST: most fingertips near wrist (priority — check early)
+  if(curlCount >= 3 && dist(w,i) < 0.17 && dist(w,m) < 0.17){
+    // allow slight thumb out still count as fist
+    if(!iExt && !mExt) return 'fist';
+  }
+
+  // Thumbs up/down
+  if(thumbExt && curlCount >= 3 && !iExt && !mExt){
+    if(t.y < w.y - 0.02 || t.y < tMcp.y - 0.015) return 'thumb_up';
+    if(t.y > w.y + 0.04 || t.y > tMcp.y + 0.03) return 'thumb_down';
+    return 'thumb_up';
+  }
+  // Open palm
+  if(allExt && pinch > 0.08) return 'open_palm';
+  // Peace
+  if(iExt && mExt && !rExt && !pExt) return 'peace';
+  // Point
+  if(iExt && !mExt && !rExt && !pExt) return 'point';
+  // Fist fallback
+  if(allCurl) return 'fist';
+  return 'none';
+}
+
+function hiG(n){
+  ['gPoint','gPalm','gPinch','gFist','gPeace','gThumb','gDown'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on')});
+  const map={point:'gPoint',open_palm:'gPalm',pinch:'gPinch',fist:'gFist',peace:'gPeace',thumb_up:'gThumb',thumb_down:'gDown'};
+  if(map[n])document.getElementById(map[n])?.classList.add('on');
+}
+
+const CONN=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
+function drawHand(lms,w,h){
+  ctx.lineWidth=2;ctx.strokeStyle='rgba(0,229,255,0.9)';
+  CONN.forEach(([a,b])=>{ctx.beginPath();ctx.moveTo(lms[a].x*w,lms[a].y*h);ctx.lineTo(lms[b].x*w,lms[b].y*h);ctx.stroke()});
+  lms.forEach((lm,i)=>{ctx.beginPath();ctx.arc(lm.x*w,lm.y*h,i===8?7:3,0,6.28);ctx.fillStyle=i===8?'#fbbf24':'#00e5ff';ctx.fill()});
+}
+
+/** Map normalized hand tip (0-1, mirrored) to full window coordinates */
+function tipToScreen(tip){
+  return {x:tip.x*window.innerWidth, y:tip.y*window.innerHeight};
+}
+
+function cellAtScreen(sx,sy){
+  const rect=grid.getBoundingClientRect();
+  if(sx<rect.left||sx>rect.right||sy<rect.top||sy>rect.bottom)return null;
+  const rx=(sx-rect.left)/rect.width, ry=(sy-rect.top)/rect.height;
+  const col=Math.min(17,Math.max(0,Math.floor(rx*18)));
+  const row=Math.min(8,Math.max(0,Math.floor(ry*9)));
+  const cell=grid.children[row*18+col];
+  return cell?.dataset.n?byN[+cell.dataset.n]:null;
+}
+
+let frames=0,lastT=performance.now();
+
+function onResults(res){
+  frames++;const now=performance.now();
+  if(now-lastT>=1000){document.getElementById('stFps').textContent=frames;frames=0;lastT=now}
+  const w=video.videoWidth||640,h=video.videoHeight||480;
+  if(cv.width!==w){cv.width=w;cv.height=h}
+  ctx.save();ctx.clearRect(0,0,w,h);ctx.translate(w,0);ctx.scale(-1,1);ctx.drawImage(res.image,0,0,w,h);ctx.restore();
+
+  if(res.multiHandLandmarks?.length){
+    document.getElementById('stHand').textContent='ON';document.getElementById('stHand').className='ok';
+    // Mirror all hands
+    const all = res.multiHandLandmarks.map(raw => raw.map(p => ({x:1-p.x, y:p.y, z:p.z})));
+    all.forEach(lms => drawHand(lms, w, h));
+
+    // Primary hand = first detected (for gestures + cursor)
+    const lms = all[0];
+    const tip = lms[8];
+    prevHX = handX; prevHY = handY;
+    handX = tip.x; handY = tip.y;
+
+    // Full-screen cursor from primary index tip
+    const scr = tipToScreen(tip);
+    cursor.classList.add('show');
+    cursor.style.left = scr.x + 'px';
+    cursor.style.top = scr.y + 'px';
+    cursor.classList.remove('pinch');
+
+    // Two-hand distance (for zoom in 3D)
+    let twoHandDist = 0;
+    if(all.length >= 2){
+      const a = all[0][8], b = all[1][8]; // index tips
+      twoHandDist = dist(a, b);
+      cursor.classList.add('pinch'); // visual: two hands active
+    }
+
+    // Stable gesture: majority over last few frames handled via cooldown
+    const g = classify(lms);
+    hiG(g);
+    if(g !== lastG){ lastG = g; gAt = now; }
+
+    if(mode==='table'){
+      // Hand cursor selection on periodic table
+      const under = cellAtScreen(scr.x, scr.y);
+      document.querySelectorAll('.cell.hov').forEach(c => c.classList.remove('hov'));
+      if(under){
+        const cell = document.querySelector('.cell[data-n="'+under.n+'"]');
+        if(cell) cell.classList.add('hov');
+        if(!hover || hover.n !== under.n){ hover = under; hoverT = now; }
+        else if(now - hoverT > 250){ selectElement(under); }
+      } else {
+        hover = null;
+      }
+
+      // Open atom: fist held, OR open_palm held after selection (backup)
+      if(selected && g === 'fist' && now - gAt > 450){
+        openAtom();
+        gAt = now + 1200;
+      }
+      if(g === 'peace' && now - gAt > 500){
+        setMode('mol'); gAt = now; toastMsg('Molecules');
+      }
+    }else{
+      // ===== 3D MODE: two-hand zoom | one-hand rotate | particles =====
+      // TWO HANDS → zoom by distance (closer=out, farther=in). No rotate.
+      // ONE HAND open palm → rotate only. No zoom.
+      // ONE HAND other gestures → particles.
+
+      if(all.length >= 2){
+        // ---- TWO-HAND ZOOM ----
+        // twoHandDist: normalized ~0.05 (close) to ~0.6 (far)
+        const d = Math.max(0.05, Math.min(0.65, twoHandDist));
+        // far hands → zoom in (camera near), close hands → zoom out
+        const open = (d - 0.05) / (0.65 - 0.05); // 0=close, 1=far
+        const targetDist = 18 - open * 14; // close→18, far→4
+        const cur = camera.position.length();
+        const next = cur + (targetDist - cur) * 0.14;
+        camera.position.setLength(Math.max(3.2, Math.min(22, next)));
+        hiG('pinch'); // highlight two-hand zoom row
+      }
+      else if(g === 'open_palm'){
+        // ---- RELATIVE HAND ROTATION ----
+        // 1) Movement of hand in camera plane
+        const dx = handX - prevHX;
+        const dy = handY - prevHY;
+        if(Math.abs(dx) > 0.0015 || Math.abs(dy) > 0.0015){
+          rotY += dx * 5.5;   // horizontal move → yaw
+          rotX += dy * 4.0;   // vertical move → pitch
+        }
+        // 2) Palm orientation from landmarks (wrist → middle MCP / index MCP)
+        // lms[0]=wrist, lms[9]=middle MCP, lms[5]=index MCP
+        const wrist = lms[0], mid = lms[9], idx = lms[5];
+        // Palm facing vector approx in 2D
+        const orientY = (mid.x - wrist.x); // tilt left/right
+        const orientX = (mid.y - wrist.y); // tilt up/down
+        // Blend a fraction of absolute orientation for natural "hand turn" feel
+        const targetYaw = orientY * 2.8;
+        const targetPitch = orientX * 2.2;
+        rotY += (targetYaw - rotY) * 0.04;
+        rotX += (targetPitch - rotX) * 0.04;
+        rotX = Math.max(-1.5, Math.min(1.5, rotX));
+      }
+      else if(mode === 'atom' && now - gAt > 550){
+        if(g === 'peace'){
+          st.e = Math.min(st.p + 12, st.e + 1);
+          buildBohr(); gAt = now; toastMsg('+ Electron');
+        } else if(g === 'thumb_up'){
+          st.p = Math.min(120, st.p + 1);
+          buildBohr(); gAt = now; toastMsg('+ Proton');
+        } else if(g === 'thumb_down'){
+          st.e = Math.max(0, st.e - 1);
+          buildBohr(); gAt = now; toastMsg('− Electron');
+        }
+      }
+      if(mode === 'mol' && g === 'fist' && now - gAt > 650){
+        setMode('atom'); gAt = now;
+      }
+    }
+  }else{
+    document.getElementById('stHand').textContent='OFF';document.getElementById('stHand').className='';
+    cursor.classList.remove('show','pinch');hiG('none');hasBasePinch=false;
+  }
+}
+
+const clock=new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  if(mode==='atom'||mode==='mol'){
+    const t=clock.getElapsedTime();
+    electrons.forEach(e=>{const d=e.userData;d.a+=d.spd*0.016;e.position.x=d.r*Math.cos(d.a);e.position.y=d.r*Math.sin(d.a);e.position.z=0});
+    // Apply hand rotation on top of slow auto-spin
+    const g=mode==='atom'?atomG:molG;
+    g.rotation.y=rotY+t*0.06;
+    g.rotation.x=rotX;
+    controls.update();
+    renderer.render(scene,camera);
+  }
+}
+animate();
+
+startBtn.onclick=async()=>{
+  startBtn.disabled=true;msg.textContent='Loading hand tracking…';msg.className='';
+  if(location.protocol==='file:'){msg.textContent='Run start-server.bat → http://localhost:8080/v2/index.html';msg.className='err';startBtn.disabled=false;return}
+  if(!window.Hands){msg.textContent='MediaPipe failed.';msg.className='err';startBtn.disabled=false;return}
+  try{
+    const hands=new Hands({locateFile:f=>'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/'+f});
+    hands.setOptions({maxNumHands:2,modelComplexity:1,minDetectionConfidence:0.7,minTrackingConfidence:0.6});
+    hands.onResults(onResults);
+    msg.textContent='Requesting camera…';
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false});
+    video.srcObject=stream;await video.play();
+    document.getElementById('stCam').textContent='ON';document.getElementById('stCam').className='ok';
+    const cam=new Camera(video,{onFrame:async()=>{try{await hands.send({image:video})}catch(e){}},width:1280,height:720});
+    await cam.start();
+    boot.style.display='none';app.style.display='block';
+    selected=byN[8];showDetail(selected);
+  }catch(err){
+    console.error(err);
+    let m=err.message||String(err);
+    if(err.name==='NotAllowedError')m='Camera permission denied.';
+    else if(err.name==='NotFoundError')m='No camera found.';
+    msg.textContent=m;msg.className='err';startBtn.disabled=false;
+  }
+};
+</script>
+</body>
+</html>

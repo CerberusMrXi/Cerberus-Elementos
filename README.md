@@ -8,6 +8,12 @@
 
 *Touch the elements with your fingertips — literally.*
 
+> [!IMPORTANT] <img src="https://img.icons8.com/fluency/32/hammer.png" width="22" align="absmiddle"> **UNDER CONSTRUCTION**
+> This project is currently in active development. Features and gesture recognition logic are subject to frequent updates.
+
+> [!TIP] <img src="https://img.icons8.com/fluency/32/test-account.png" width="22" align="absmiddle"> **DEMO VERSION AVAILABLE**
+> A live demo version is available for testing.
+
 </div>
 
 ---

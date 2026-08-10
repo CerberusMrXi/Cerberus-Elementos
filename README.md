@@ -26,9 +26,9 @@ Designed for educators, students, and science enthusiasts alike, the platform el
 
 ---
 
-## 📹 Demo Video
+## Demo Video
 
-https://user-images.githubusercontent.com/your-username/your-repo/demo.mp4
+https://github.com/CerberusMrXi/Cerberus-Elementos/blob/main/cerberus%20elementos%20demo.mp4
 
 ---
 
